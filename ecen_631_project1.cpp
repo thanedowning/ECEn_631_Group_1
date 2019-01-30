@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
   bool show_corners = false;
   bool show_lines = false;
   bool show_dif = false;
-  bool track_objects = false;
+  bool classify_objects = false;
 
   intro_message();
 
@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
   }
 
   cv::VideoWriter vidout;
-  vidout.open("../media/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
+  vidout.open("../output/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
               30, cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
       cv::swap(grayFrame, prevFrame);
     }
 
-    if (track_objects) {
+    if (classify_objects) {
 
     }
 
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
       show_lines = false;
       show_dif = false;
 
-      track_objects = false;
+      classify_objects = false;
     }
     if (input == '1'){
       show_bin = true;
@@ -182,8 +182,8 @@ int main(int argc, char** argv) {
       show_corners = false;
       show_lines = false;
     }
-    if (input == 't'){
-      track_objects = true;
+    if (input == 'f'){
+      classify_objects = true;
     }
   }
   return 0;
