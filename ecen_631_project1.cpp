@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
 
   std::vector<cv::Point2f> corners;
   std::vector<cv::Vec4i> lines;
+  std::vector<cv::Vec3f> circles;
 
   int binary_threshold_value = 80;
   int max_BINARY_value = 255;
@@ -115,6 +116,19 @@ int main(int argc, char** argv) {
     }
 
     if (classify_objects) {
+      GaussianBlur(grayFrame, grayFrame, cv::Size(9, 9), 2, 2);
+      threshold(grayFrame, grayFrame, binary_threshold_value, max_BINARY_value,
+                cv::THRESH_BINARY);
+      HoughCircles(grayFrame, circles, cv::HOUGH_GRADIENT, 1, 100, 60,
+                   13, 5, 30);
+      cv::swap(outFrame, inFrame);
+      for(int jt = 0; jt < circles.size(); jt++) {
+        cv::Point center(cvRound(circles[jt][0]),
+                         cvRound(circles[jt][1]));
+        int radius = cvRound(circles[jt][2]);
+        circle(outFrame, center, 3, cv::Scalar(255,255,255), -1, 8, 0 );
+        circle(outFrame, center, radius, cv::Scalar(255,255,255), 3, 8, 0 );
+      }
 
     }
 
