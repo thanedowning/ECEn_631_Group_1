@@ -7,7 +7,7 @@
 #include <ctype.h>
 
 static void intro_message() {
-  std::cout << "The following is executes task 2 of ECEn 631 Homework #1.\n";
+  std::cout << "Project 1 for ECEn 631: a Chex Mix Classifier.\n";
 
 }
 
@@ -23,7 +23,6 @@ int main(int argc, char** argv) {
   bool show_corners = false;
   bool show_lines = false;
   bool show_dif = false;
-  //bool track_corners = false;
   bool track_objects = false;
 
   intro_message();
@@ -44,11 +43,11 @@ int main(int argc, char** argv) {
   }
 
   cv::VideoWriter vidout;
-  vidout.open("task2.avi", cv::VideoWriter::fourcc('M','P','E','G'), 30,
-              cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
+  vidout.open("../media/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
+              30, cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
-  cv::namedWindow("ecen_631_hw1", 1);
+  cv::namedWindow("ecen_631_project1", 1);
 
   cv::Mat inFrame, colorFrame, grayFrame, outFrame, tmpFrame, prevFrame;
 
@@ -120,7 +119,7 @@ int main(int argc, char** argv) {
     }
 
     vidout.write(outFrame);
-    cv::imshow("ecen_631_hw1", outFrame);
+    cv::imshow("ecen_631_project1", outFrame);
 
     char input = cv::waitKey(10);
     if (input == 27) {
