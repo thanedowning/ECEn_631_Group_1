@@ -23,9 +23,9 @@ static double angle( cv::Point pt1, cv::Point pt2, cv::Point pt0 )
 
 //square detection
 // returns sequence of squares detected on the image.
-void findSquares( cv::Mat &image, cv::Mat &output )
+int findSquares( cv::Mat &image, cv::Mat &output )
 {
-	int thresh = 50, N = 11;
+	int thresh = 50, N = 11, upper_limit_area = 10000, lower_limit_area = 1000;
 	std::vector<std::vector<cv::Point> > squares;
     squares.clear();
     cv::Mat pyr, timg, gray0(image.size(), CV_8U), gray;
@@ -76,8 +76,9 @@ void findSquares( cv::Mat &image, cv::Mat &output )
                 // area may be positive or negative - in accordance with the
                 // contour orientation
                 if( approx.size() == 4 &&
-                    fabs(cv::contourArea(approx)) > 1000 &&
-                    cv::isContourConvex(approx) )
+                    fabs(cv::contourArea(approx)) > lower_limit_area &&
+                    cv::isContourConvex(approx) &&
+                    fabs(cv::contourArea(approx)) < upper_limit_area)
                 {
                     double maxCosine = 0;
                     for( int j = 2; j < 5; j++ )
@@ -102,18 +103,33 @@ void findSquares( cv::Mat &image, cv::Mat &output )
 	{
 	    const cv::Point* p = &squares[i][0];
 	    int n = (int)squares[i].size();
-	    cv::polylines(image, &p, &n, 1, true, cv::Scalar(0,255,0), 3, cv::LINE_AA);
+	    //cv::polylines(image, &p, &n, 1, true, cv::Scalar(0,255,0), 3, cv::LINE_AA);
 	}
 	output = image;
+  if (squares.size() > 0) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
 }
 
 
 // circle detection
-void findCircles(cv::Mat &input, cv::Mat &output){
-	cv::Mat gray;
-    cv::cvtColor(input, gray, cv::COLOR_BGR2GRAY);
-    cv::medianBlur(gray, gray, 5);
-    std::vector<cv::Vec3f> circles;
+int findCircles(cv::Mat &input, cv::Mat &output){
+  cv::Mat gray;
+  cv::cvtColor(input, gray, cv::COLOR_BGR2GRAY);
+
+  // erode out the noise
+	cv::erode(gray, gray,
+            cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
+
+	// dilate again to fill in holes
+	cv::dilate(gray, gray,
+             cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
+  //cv::medianBlur(gray, gray, 5);
+  std::vector<cv::Vec3f> circles;
+  int inner_radius = 25, outer_radius = 150, accumulation_thresh = 14;
 
 	/*  Hough Circle parameters
 	src_gray: Input image (grayscale)
@@ -127,24 +143,50 @@ void findCircles(cv::Mat &input, cv::Mat &output){
 	max_radius = 0: Maximum radius to be detected. If unknown, put zero as default
 	*/
 
-    cv::HoughCircles(gray, circles, cv::HOUGH_GRADIENT, 1,
-                 gray.rows/3,  // change this value to detect circles with different distances to each other
-                 150, 30, 15, 150 // change the last two parameters
-            // (min_radius & max_radius) to detect larger circles
-    );
-    for( size_t i = 0; i < circles.size(); i++ )
-    {
-        cv::Vec3i c = circles[i];
-        cv::Point center = cv::Point(c[0], c[1]);
-        // circle center
-        cv::circle( output, center, 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
-        // circle outline
-        int radius = c[2];
-        cv::circle( output, center, radius, cv::Scalar(255,0,255), 3, cv::LINE_AA);
-    }
+  cv::HoughCircles(gray, circles, cv::HOUGH_GRADIENT, 1,
+               gray.rows/3,  // change this value to detect circles with different distances to each other
+               150, accumulation_thresh, inner_radius, outer_radius // change the last two parameters
+          // (min_radius & max_radius) to detect larger circles
+  );
+  for( size_t i = 0; i < circles.size(); i++ )
+  {
+    cv::Vec3i c = circles[i];
+    cv::Point center = cv::Point(c[0], c[1]);
+    // circle center
+    //cv::circle( output, center, 1, cv::Scalar(0,100,100), 3, cv::LINE_AA);
+    // circle outline
+    int radius = c[2];
+    //cv::circle( output, center, radius, cv::Scalar(255,0,255), 3, cv::LINE_AA);
+  }
+  if (circles.size() > 0) {
+    return 1;
+  }
+  else {
+    return 0;
+  }
 }
 
-
+int findRye(cv::Mat &input, cv::Mat &output) {
+  int rye_thresh = 78, belt_thresh = 55, max_BINARY_value = 255;
+  int belt_bright_pixels = 0, belt_pixel_tresh = 8000;
+  int rye_bright_pixels = 0, rye_pixel_tresh = 6000;
+  cv::Mat grayFrame, tmp;
+  cv::cvtColor(input, grayFrame, cv::COLOR_BGR2GRAY);
+  cv::threshold(grayFrame, tmp, belt_thresh, max_BINARY_value, cv::THRESH_BINARY);
+  belt_bright_pixels = countNonZero(tmp);
+  if (belt_bright_pixels > belt_pixel_tresh) {
+    cv::erode(grayFrame, grayFrame,
+              cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5,5)));
+    cv::dilate(grayFrame, grayFrame,
+               cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5,5)));
+    cv::threshold(grayFrame, tmp, rye_thresh, max_BINARY_value, cv::THRESH_BINARY);
+    rye_bright_pixels = countNonZero(tmp);
+    if (rye_bright_pixels < rye_pixel_tresh) {
+      return 1;
+    }
+  }
+  return 0;
+}
 
 
 
@@ -160,7 +202,7 @@ int main(int argc, char** argv) {
   bool show_corners = false;
   bool show_lines = false;
   bool show_dif = false;
-  bool classify_objects = false;
+  bool show_shapes = false;
   bool show_circles = false;
   bool show_squares = false;
 
@@ -194,10 +236,14 @@ int main(int argc, char** argv) {
   std::vector<cv::Vec4i> lines;
   std::vector<cv::Vec3f> circles;
 
-  int binary_threshold_value = 120;
+  int binary_threshold_value = 80;
   int max_BINARY_value = 255;
   double canny_threshold_1 = 15;
   double canny_threshold_2 = 80;
+  int stay_count = 0;
+  int square_found_count = 0;
+  int rye_found_count = 0;
+  int circle_found_count = 0;
 
   while (true) {
     vid >> inFrame;
@@ -213,8 +259,11 @@ int main(int argc, char** argv) {
     }
 
     if (show_bin) {
+      //cv::erode(grayFrame, grayFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5,5)));
+    	//cv::dilate(grayFrame, grayFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5,5)));
       cv::threshold(grayFrame, outFrame, binary_threshold_value, max_BINARY_value,
                 cv::THRESH_BINARY);
+      std::cout << countNonZero(outFrame) << std::endl;
     }
 
     if (show_canny) {
@@ -255,11 +304,41 @@ int main(int argc, char** argv) {
     }
 
     if (show_squares) {
-      findSquares(colorFrame, outFrame);
+      std::cout << findSquares(colorFrame, outFrame) << " Squares" << std::endl;
     }
 
     if (show_circles) {
-      findCircles(colorFrame, outFrame);
+      std::cout <<  findCircles(colorFrame, outFrame) << " Circles" << std::endl;
+    }
+
+    if (show_shapes) {
+      stay_count++;
+
+      if (findSquares(colorFrame, outFrame)) {
+        square_found_count++;
+        rye_found_count = 0;
+        stay_count = 0;
+        if (square_found_count > 2)
+        std::cout << "Chex: Good" << std::endl;
+      }
+      else if (findCircles(colorFrame, outFrame)) {
+        circle_found_count++;
+        stay_count = 0;
+        if (circle_found_count > 2)
+        std::cout << "Pret: Bad" << std::endl;
+      }
+      else if (findRye(colorFrame, outFrame) && circle_found_count < 2) {
+        rye_found_count++;
+        stay_count = 0;
+        if (rye_found_count > 7)
+          std::cout << "Rye: Ugly" << std::endl;
+      }
+      if (stay_count != 0 && (stay_count % 10) == 0) {
+        std::cout << std::endl;
+        square_found_count = 0;
+        rye_found_count = 0;
+        circle_found_count = 0;
+      }
     }
 
     //vidout.write(outFrame);
@@ -279,7 +358,7 @@ int main(int argc, char** argv) {
       show_lines = false;
       show_dif = false;
 
-      classify_objects = false;
+      show_shapes = false;
       show_circles = false;
       show_squares = false;
     }
@@ -327,6 +406,9 @@ int main(int argc, char** argv) {
       show_canny = false;
       show_corners = false;
       show_lines = false;
+    }
+    if (input == 'f'){
+      show_shapes = true;
     }
     if (input == 's'){
       show_squares = true;
