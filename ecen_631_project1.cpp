@@ -166,7 +166,7 @@ int findCircles(cv::Mat &input, cv::Mat &output){
   }
 }
 
-int findRye(cv::Mat &input, cv::Mat &output) {
+int findRye(cv::Mat &input, cv::Mat &mask, cv::Mat &output) {
   int rye_thresh = 78, belt_thresh = 55, max_BINARY_value = 255;
   int belt_bright_pixels = 0, belt_pixel_tresh = 8000;
   int rye_bright_pixels = 0, rye_pixel_tresh = 6000;
@@ -230,7 +230,9 @@ int main(int argc, char** argv) {
 
   cv::namedWindow("ecen_631_project1", 1);
 
-  cv::Mat inFrame, colorFrame, grayFrame, outFrame, tmpFrame, prevFrame;
+  cv::Mat inFrame, colorFrame, grayFrame, outFrame, tmpFrame, prevFrame, mask;
+
+  mask = imread("belt_mask.jpg", cv::IMREAD_GRAYSCALE);
 
   std::vector<cv::Point2f> corners;
   std::vector<cv::Vec4i> lines;
@@ -261,8 +263,11 @@ int main(int argc, char** argv) {
     if (show_bin) {
       //cv::erode(grayFrame, grayFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5,5)));
     	//cv::dilate(grayFrame, grayFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(5,5)));
-      cv::threshold(grayFrame, outFrame, binary_threshold_value, max_BINARY_value,
-                cv::THRESH_BINARY);
+      cv::threshold(grayFrame, grayFrame, binary_threshold_value, max_BINARY_value,
+                    cv::THRESH_BINARY);
+      cv::threshold(mask, mask, binary_threshold_value, max_BINARY_value,
+                    cv::THRESH_BINARY);
+      bitwise_and(grayFrame, mask, outFrame);
       std::cout << countNonZero(outFrame) << std::endl;
     }
 
@@ -327,7 +332,7 @@ int main(int argc, char** argv) {
         if (circle_found_count > 2)
         std::cout << "Pret: Bad" << std::endl;
       }
-      else if (findRye(colorFrame, outFrame) && circle_found_count < 2) {
+      else if (findRye(colorFrame, mask, outFrame) && circle_found_count < 2) {
         rye_found_count++;
         stay_count = 0;
         if (rye_found_count > 7)
