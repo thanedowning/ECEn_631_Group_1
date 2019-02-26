@@ -9,12 +9,9 @@ mkdir build
 cd build
 cmake ..
 make
+./<project executable> 2 # Use "2" to interface to Logitech webcam; leave blank for integrated webcam
 ```
 ### Use for Project 1: Visual Inspection
-
-```shell
-./ecen_631_project1 2 # Use "2" to interface to Logitech webcam; leave blank for integrated webcam
-```
 
 Use keys 1 through 5 for testing different effects.  Press f to turn on object classification.  Press esc to quit.
 
