@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
   }
 
   cv::VideoWriter vidout;
-  vidout.open("../output/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
+  vidout.open("../out/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
               30, cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
@@ -266,7 +266,7 @@ int main(int argc, char** argv) {
       std::cout << countNonZero(outFrame) << std::endl;
     }
 
-    if (show_canny) { 
+    if (show_canny) {
       cv::Canny	(grayFrame, outFrame, canny_threshold_1, canny_threshold_2, 3,
                  false);
     }
