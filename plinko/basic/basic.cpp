@@ -7,7 +7,6 @@
 
 int fd, n, i;
 char buf[128] = "temp text";
-using namespace cv;
 
 void sendCommand(const char* command) {
   printf("Sending Command: %s", command);
@@ -38,22 +37,39 @@ int setupSerial() {
 }
 
 
-int main(int, char**)
-{   int frameCounter = 0;
-  Mat frameLast;
-  VideoCapture cap(0); // open the default camera
+int main(int, char**) {
+  int frameCounter = 0;
+  cv::VideoCapture vid; // open the default camera
+
+  if (vidStreamDevice.size() == 1 && isdigit(vidStreamDevice[0])) {
+    vid.open(vidStreamDevice[0] - '0');
+  }
+  else {
+    vid.open(0);
+  }
+
+  if (!vid.isOpened()) {
+    std::cout << "Image source not found; program terminating.\n";
+    return 0;
+  }
+
+  cv::VideoWriter vidout;
+  vidout.open("../out/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
+              30, cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
+              vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
+
+  cv::namedWindow("Camera Input", 1);
+
   setupSerial();
-  if(!cap.isOpened())  // check if we succeeded
-  return -1;
 
-  cap >> frameLast;
+  cv::Mat inFrame, colorFrame, grayFrame, outFrame, tmpFrame, prevFrame;
+
   sendCommand("h\n"); // Home the motor and encoder
-  for(;;) {
+  while(true) {
     frameCounter++;
-    Mat frame;
 
-    cap >> frame; // get a new frame from camera
-    if(!frame.empty()) {
+    vid >> inFrame; // get a new frame from camera
+    if(!inFrame.empty()) {
       //ADD YOUR CODE HERE
 
 
