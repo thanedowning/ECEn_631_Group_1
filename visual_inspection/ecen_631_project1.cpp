@@ -266,7 +266,7 @@ int main(int argc, char** argv) {
       std::cout << countNonZero(outFrame) << std::endl;
     }
 
-    if (show_canny) {
+    if (show_canny) { 
       cv::Canny	(grayFrame, outFrame, canny_threshold_1, canny_threshold_2, 3,
                  false);
     }
