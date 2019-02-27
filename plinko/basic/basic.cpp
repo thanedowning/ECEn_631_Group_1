@@ -55,7 +55,7 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
     }
 }
 
-int main(int, char**) {
+int main(int argc, char** argv) {
   int frameCounter = 0;
   cv::VideoCapture vid; // open the default camera
 
@@ -82,7 +82,7 @@ int main(int, char**) {
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
   cv::namedWindow("Camera Input", 1);
-  setMouseCallback("Camera Input", onMouse, 0);
+  cv::setMouseCallback("Camera Input", onMouse, 0);
 
   setupSerial();
 
@@ -132,6 +132,7 @@ int main(int, char**) {
       // ----- START PROJECT CODE  ----- //
       // Read image
 
+<<<<<<< HEAD
       // Blob Detection
       Mat im = imread( "blob.jpg", IMREAD_GRAYSCALE );
 
@@ -148,6 +149,8 @@ int main(int, char**) {
       drawKeypoints( im, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
 
+=======
+>>>>>>> 5f4b3365088ca0d60def05471388a73dbcb23869
 
       cv::imshow("Camera Input", inFrame);
 
