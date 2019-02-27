@@ -130,21 +130,23 @@ int main(int, char**) {
     if(!inFrame.empty()) {
 
       // ----- START PROJECT CODE  ----- //
+      // Read image
 
-      threshold(grayScale, output, 10, 255,0);
+      // Blob Detection
+      Mat im = imread( "blob.jpg", IMREAD_GRAYSCALE );
 
+      // Set up the detector with default parameters.
+      SimpleBlobDetector detector;
 
-      if(leftRight == 'L'){
-  			cv::absdiff(initialLframe,frame,processFrame);
-  		}else{
-  			cv::absdiff(initialRframe,frame,processFrame);
-  		}
+      // Detect blobs.
+      std::vector<KeyPoint> keypoints;
+      detector.detect( im, keypoints);
 
-  		// erode out the noise
-  		cv::erode(processFrame, processFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
+      // Draw detected blobs as red circles.
+      // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the circle corresponds to the size of blob
+      Mat im_with_keypoints;
+      drawKeypoints( im, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-  		// dilate again to fill in holes
-  		cv::dilate(processFrame, processFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
 
 
       cv::imshow("Camera Input", inFrame);
