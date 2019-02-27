@@ -4,9 +4,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
+#include <stdio.h>
 
 int fd, n, i;
 char buf[128] = "temp text";
+cv::Point2f point;          // point (xy pixel location) that is clicked
+bool measurePoint = false;  // after mouse click, set to true
+bool measuredRed = false;   // whether red ball color has been measured with click
+bool measuredGreen = false; // same for green ball
+bool measuredBlue = false;  // same for blue ball
+bool calibrated = false;    // used to stop the calibration loop
 
 void sendCommand(const char* command) {
   printf("Sending Command: %s", command);
@@ -36,10 +43,26 @@ int setupSerial() {
   return 0;
 }
 
+static void intro_message() {
+  std::cout << "Project 2 for ECEn 631: Plinko Ball Catcher.\n";
+
+}
+
+static void onMouse(int event, int x, int y, int flags, void* userdata) {
+    if(event == cv::EVENT_LBUTTONDOWN) {
+        point = cv::Point2f((float)x, (float)y);
+        measurePoint = true;
+    }
+}
 
 int main(int, char**) {
   int frameCounter = 0;
   cv::VideoCapture vid; // open the default camera
+
+  intro_message();
+
+  cv::CommandLineParser parser(argc, argv, "{@vidStreamDevice|0|}");
+  std::string vidStreamDevice = parser.get<std::string>("@vidStreamDevice");
 
   if (vidStreamDevice.size() == 1 && isdigit(vidStreamDevice[0])) {
     vid.open(vidStreamDevice[0] - '0');
@@ -59,22 +82,74 @@ int main(int, char**) {
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
   cv::namedWindow("Camera Input", 1);
+  setMouseCallback("Camera Input", onMouse, 0);
 
   setupSerial();
 
-  cv::Mat inFrame, colorFrame, grayFrame, outFrame, tmpFrame, prevFrame;
+  cv::Vec3b redColor, greenColor, blueColor;
+  cv::Mat inFrame, grayFrame, outFrame, tmpFrame, prevFrame;
+  // constexpr cv::Point2f topLeft = (240,20);
+  // constexpr cv::Point2f topRight = (740,20);
+  // constexpr cv::Point2f bottomLeft = (210,670);
+  // constexpr cv::Point2f bottomRight = (750,670);
 
   sendCommand("h\n"); // Home the motor and encoder
+
+  // Calibrate colors
+  while(!calibrated) {
+    vid >> inFrame;
+    if(!inFrame.empty()) {
+      if(measurePoint) {
+        if(!measuredRed) {
+          redColor = inFrame.at<cv::Vec3b>(point);
+          measuredRed = true;
+          measurePoint = false;
+        }
+        else if(!measuredGreen) {
+          greenColor = inFrame.at<cv::Vec3b>(point);
+          measuredGreen = true;
+          measurePoint = false;
+        }
+        else if(!measuredBlue) {
+          blueColor = inFrame.at<cv::Vec3b>(point);
+          measuredBlue = true;
+          measurePoint = false;
+          calibrated = true;
+        }
+      }
+      cv::imshow("Camera Input", inFrame);
+      cv::waitKey(10);
+    }
+  }
+
+  // infinite loop
   while(true) {
     frameCounter++;
-
     vid >> inFrame; // get a new frame from camera
+
     if(!inFrame.empty()) {
-      //ADD YOUR CODE HERE
+
+      // ----- START PROJECT CODE  ----- //
+
+      threshold(grayScale, output, 10, 255,0);
 
 
-      imshow("Camera Input", frame);
-      if(waitKey(10) >= 0) break;
+      if(leftRight == 'L'){
+  			cv::absdiff(initialLframe,frame,processFrame);
+  		}else{
+  			cv::absdiff(initialRframe,frame,processFrame);
+  		}
+
+  		// erode out the noise
+  		cv::erode(processFrame, processFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
+
+  		// dilate again to fill in holes
+  		cv::dilate(processFrame, processFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
+
+
+      cv::imshow("Camera Input", inFrame);
+
+      if(cv::waitKey(10) >= 0) break;
 
       // Command structure is very simple
       // "h\n" is to home the motor
