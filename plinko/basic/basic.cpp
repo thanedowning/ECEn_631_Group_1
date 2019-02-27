@@ -55,7 +55,7 @@ static void onMouse(int event, int x, int y, int flags, void* userdata) {
     }
 }
 
-int main(int, char**) {
+int main(int argc, char** argv) {
   int frameCounter = 0;
   cv::VideoCapture vid; // open the default camera
 
@@ -82,7 +82,7 @@ int main(int, char**) {
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
   cv::namedWindow("Camera Input", 1);
-  setMouseCallback("Camera Input", onMouse, 0);
+  cv::setMouseCallback("Camera Input", onMouse, 0);
 
   setupSerial();
 
@@ -130,21 +130,6 @@ int main(int, char**) {
     if(!inFrame.empty()) {
 
       // ----- START PROJECT CODE  ----- //
-
-      threshold(grayScale, output, 10, 255,0);
-
-
-      if(leftRight == 'L'){
-  			cv::absdiff(initialLframe,frame,processFrame);
-  		}else{
-  			cv::absdiff(initialRframe,frame,processFrame);
-  		}
-
-  		// erode out the noise
-  		cv::erode(processFrame, processFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
-
-  		// dilate again to fill in holes
-  		cv::dilate(processFrame, processFrame, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(10,10)));
 
 
       cv::imshow("Camera Input", inFrame);
