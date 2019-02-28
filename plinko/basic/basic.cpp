@@ -132,7 +132,6 @@ int main(int argc, char** argv) {
       // ----- START PROJECT CODE  ----- //
       // Read image
 
-<<<<<<< HEAD
       // Blob Detection
       Mat im = imread( "blob.jpg", IMREAD_GRAYSCALE );
 
@@ -148,9 +147,6 @@ int main(int argc, char** argv) {
       Mat im_with_keypoints;
       drawKeypoints( im, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-
-=======
->>>>>>> 5f4b3365088ca0d60def05471388a73dbcb23869
 
       cv::imshow("Camera Input", inFrame);
 
