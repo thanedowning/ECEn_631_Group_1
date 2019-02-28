@@ -147,7 +147,6 @@ int main(int argc, char** argv) {
       Mat im_with_keypoints;
       drawKeypoints( im, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-
       cv::imshow("Camera Input", inFrame);
 
       if(cv::waitKey(10) >= 0) break;
