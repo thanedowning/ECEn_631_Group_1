@@ -123,6 +123,9 @@ int main(int argc, char** argv) {
   }
 
   // infinite loop
+
+  cv::Mat grayScale;
+
   while(true) {
     frameCounter++;
     vid >> inFrame; // get a new frame from camera
@@ -132,28 +135,72 @@ int main(int argc, char** argv) {
       // ----- START PROJECT CODE  ----- //
       // Read image
 
-<<<<<<< HEAD
-      // Blob Detection
-      Mat im = imread( "blob.jpg", IMREAD_GRAYSCALE );
+      ////// Blob Detection/////
+      //cv::Mat im = cv::imread( "blob.jpg", cv::IMREAD_GRAYSCALE );
+      cv::cvtColor( inFrame, grayScale, CV_BGR2GRAY );
 
-      // Set up the detector with default parameters.
-      SimpleBlobDetector detector;
+      // Setup SimpleBlobDetector parameters.
+      cv::SimpleBlobDetector::Params params;
+
+      // Change thresholds
+      params.minThreshold = 10;
+      params.maxThreshold = 200;
+
+      // Filter by Area.
+      params.filterByArea = true;
+      params.minArea = 1500; // pixel area
+
+      // Filter by Circularity
+      params.filterByCircularity = true;
+      params.minCircularity = 0.9; //1 is a perfect circle
+
+      // Filter by Convexity
+      params.filterByConvexity = false;
+      // params.minConvexity = 0.87;
+
+      // Filter by Inertia
+      params.filterByInertia = false;
+      // params.minInertiaRatio = 0.01;
+
+      std::vector<cv::KeyPoint> keypoints;
+
+      #if CV_MAJOR_VERSION < 3   // If you are using OpenCV 2
+
+        // Set up detector with params
+        cv::SimpleBlobDetector detector(params);
+
+        // You can use the detector this way
+        detector.detect( inFrame, keypoints);
+
+      #else
+
+        // Set up detector with params
+        cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
+
+        // SimpleBlobDetector::create creates a smart pointer.
+        // So you need to use arrow ( ->) instead of dot ( . )
+        detector->detect( inFrame, keypoints);
+
+      #endif
 
       // Detect blobs.
-      std::vector<KeyPoint> keypoints;
-      detector.detect( im, keypoints);
+
+      // detector.detect( inFrame, keypoints);
 
       // Draw detected blobs as red circles.
       // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the circle corresponds to the size of blob
-      Mat im_with_keypoints;
-      drawKeypoints( im, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+      cv::Mat im_with_keypoints;
+      cv::drawKeypoints( inFrame, keypoints, im_with_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-
-=======
->>>>>>> 5f4b3365088ca0d60def05471388a73dbcb23869
+      // Show blobs
+      cv::imshow("keypoints", im_with_keypoints );
+      cv::waitKey(0);
 
       cv::imshow("Camera Input", inFrame);
 
+
+
+      // enter a value greater than 0 to break out of the loop
       if(cv::waitKey(10) >= 0) break;
 
       // Command structure is very simple
