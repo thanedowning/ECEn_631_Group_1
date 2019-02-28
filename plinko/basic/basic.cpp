@@ -1,10 +1,10 @@
-#include <opencv2/opencv.hpp>
-
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <stdio.h>
+
+#include <opencv2/opencv.hpp>
 
 int fd, n, i;
 char buf[128] = "temp text";
@@ -136,16 +136,18 @@ int main(int argc, char** argv) {
       Mat im = imread( "blob.jpg", IMREAD_GRAYSCALE );
 
       // Set up the detector with default parameters.
-      SimpleBlobDetector detector;
+      cv::SimpleBlobDetector detector;
 
       // Detect blobs.
-      std::vector<KeyPoint> keypoints;
-      detector.detect( im, keypoints);
+      std::vector<cv::KeyPoint> keypoints;
+      detector.detect(im, keypoints);
 
       // Draw detected blobs as red circles.
-      // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the circle corresponds to the size of blob
-      Mat im_with_keypoints;
-      drawKeypoints( im, keypoints, im_with_keypoints, Scalar(0,0,255), DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+      // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the
+      // circle corresponds to the size of blob
+      cv::Mat im_with_keypoints;
+      cv::drawKeypoints(im, keypoints, im_with_keypoints, cv::Scalar(0,0,255),
+                        DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
       cv::imshow("Camera Input", inFrame);
 
