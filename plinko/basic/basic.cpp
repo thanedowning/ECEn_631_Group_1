@@ -82,19 +82,24 @@ int main(int argc, char** argv) {
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
   cv::namedWindow("Camera Input", 1);
-  cv::setMouseCallback("Camera Input", onMouse, 0);
+  cv::namedWindow("Blue Channel", 1);
+  cv::namedWindow("Green Channel", 1);
+  cv::namedWindow("Red Channel", 1);
+  //cv::setMouseCallback("Camera Input", onMouse, 0);
 
-  setupSerial();
+  //setupSerial();
 
   cv::Vec3b redColor, greenColor, blueColor;
   cv::Mat inFrame, grayFrame, outFrame, tmpFrame, prevFrame;
+  cv::Mat bgrFrames[3];
+  std::vector<cv::KeyPoint> keypoints;
   // constexpr cv::Point2f topLeft = (240,20);
   // constexpr cv::Point2f topRight = (740,20);
   // constexpr cv::Point2f bottomLeft = (210,670);
   // constexpr cv::Point2f bottomRight = (750,670);
 
-  sendCommand("h\n"); // Home the motor and encoder
-
+  //sendCommand("h\n"); // Home the motor and encoder
+/*
   // Calibrate colors
   while(!calibrated) {
     vid >> inFrame;
@@ -121,36 +126,83 @@ int main(int argc, char** argv) {
       cv::waitKey(10);
     }
   }
+  */
 
   // infinite loop
   while(true) {
     frameCounter++;
     vid >> inFrame; // get a new frame from camera
-
+    cv::split(inFrame,bgrFrames);
     if(!inFrame.empty()) {
 
       // ----- START PROJECT CODE  ----- //
       // Read image
 
-      // Blob Detection
-      Mat im = imread( "blob.jpg", IMREAD_GRAYSCALE );
 
-      // Set up the detector with default parameters.
-      cv::SimpleBlobDetector detector;
+
+      ////// Blob Detection/////
+      //cv::Mat im = cv::imread( "blob.jpg", cv::IMREAD_GRAYSCALE );
+      for(int i=0; i < 3; i++) {
+        cv::cvtColor(inFrame, grayFrame, CV_BGR2GRAY);
+
+        // Setup SimpleBlobDetector parameters.
+        cv::SimpleBlobDetector::Params params;
+
+        // Change thresholds
+        params.minThreshold = 10;
+        params.maxThreshold = 200;
+
+        // Filter by Area.
+        params.filterByArea = true;
+        params.minArea = 1500; // pixel area
+
+        // Filter by Circularity
+        params.filterByCircularity = true;
+        params.minCircularity = 0.9; //1 is a perfect circle
+
+        // Filter by Convexity
+        params.filterByConvexity = false;
+        // params.minConvexity = 0.87;
+
+        // Filter by Inertia
+        params.filterByInertia = false;
+        // params.minInertiaRatio = 0.01;
+
+        // Set up detector with params
+        cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
+
+        // SimpleBlobDetector::create creates a smart pointer.
+        // So you need to use arrow ( ->) instead of dot ( . )
+        detector->detect(inFrame, keypoints);
+      }
+
+
+
 
       // Detect blobs.
-      std::vector<cv::KeyPoint> keypoints;
-      detector.detect(im, keypoints);
+
+      // detector.detect( inFrame, keypoints);
 
       // Draw detected blobs as red circles.
-      // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the
-      // circle corresponds to the size of blob
+      // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the circle corresponds to the size of blob
       cv::Mat im_with_keypoints;
-      cv::drawKeypoints(im, keypoints, im_with_keypoints, cv::Scalar(0,0,255),
-                        DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+      cv::drawKeypoints(inFrame, keypoints, im_with_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
 
-      cv::imshow("Camera Input", inFrame);
+      // Show blobs
+      //cv::imshow("keypoints", im_with_keypoints );
+      cv::waitKey(0);
 
+      //cv::imshow("Camera Input", inFrame);
+      cv::imshow("Blue Input", bgrFrames[0]);
+      //cv::imshow("Green Input", bgrFrames[1]);
+      //cv::imshow("Red Input", bgrFrames[2]);
+      if (bgrFrames[0].empty()) {
+        std::cout << "Blue Channel Empty\n";
+      }
+
+
+
+      // enter a value greater than 0 to break out of the loop
       if(cv::waitKey(10) >= 0) break;
 
       // Command structure is very simple
@@ -158,10 +210,10 @@ int main(int argc, char** argv) {
       // "g<integer range 7 to 53>\n" sends the motor to that position in cm
       // e.g. "g35\n" sends the motor to 35cm from left wall
       if(frameCounter%200==0) {
-        sendCommand("g10\n");
+        //sendCommand("g10\n");
       }
       else if(frameCounter%100==0){
-        sendCommand("g50\n");
+        //sendCommand("g50\n");
       }
     }
   }
