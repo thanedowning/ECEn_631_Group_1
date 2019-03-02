@@ -35,16 +35,19 @@ while cap.isOpened():
     # continue
 
     # define range of blue color in HSV
-    lower_blue = np.array([75,200,100])
-    upper_blue  = np.array([100,255,255])
-    # lower = np.array([0,150,0])
-    # upper = np.array([255,255,255])
-    # lower = np.array([100])
-    # upper = np.array([255])
+    lower_green = np.array([70,80,0])
+    upper_green  = np.array([85,255,255])
+
+    lower_blue = np.array([86,170,0])
+    upper_blue = np.array([102,255,255])
+
+    lower_red = np.array([160,100,0])
+    upper_red = np.array([180,255,255])
 
     # Threshold the HSV image to get only blue colors
+    # mask = cv2.inRange(hsv, lower_green, upper_green)
+    # mask = cv2.inRange(hsv, lower_blue, upper_blue)
     mask = cv2.inRange(hsv, lower_blue, upper_blue)
-    # mask = cv2.inRange(green, lower, upper)
 
     kernel = np.ones((8,8),np.uint8)
     erosion = cv2.erode(mask,kernel,iterations = 1)
@@ -66,11 +69,11 @@ while cap.isOpened():
     params.minArea = 20
 
     # Filter by Circularity
-    params.filterByCircularity = True
+    params.filterByCircularity = False
     params.minCircularity = 0.2
 
     # Filter by Convexity
-    params.filterByConvexity = True
+    params.filterByConvexity = False
     params.minConvexity = 0.5
 
     # Filter by Inertia

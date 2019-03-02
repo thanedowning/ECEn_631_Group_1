@@ -10,10 +10,9 @@ int fd, n, i;
 char buf[128] = "temp text";
 cv::Point2f point;          // point (xy pixel location) that is clicked
 bool measurePoint = false;  // after mouse click, set to true
-bool measuredRed = false;   // whether red ball color has been measured with click
-bool measuredGreen = false; // same for green ball
-bool measuredBlue = false;  // same for blue ball
 bool calibrated = false;    // used to stop the calibration loop
+cv::Vec3b clickedPointVal;
+int clickCount = 0;
 
 void sendCommand(const char* command) {
   printf("Sending Command: %s", command);
@@ -24,7 +23,6 @@ void sendCommand(const char* command) {
 }
 
 int setupSerial() {
-
   struct termios toptions;
   fd = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY); // open serial port
   printf("fd opened as %i\n", fd);
@@ -39,7 +37,6 @@ int setupSerial() {
   toptions.c_lflag |= ICANON;           // Canonical mode
   tcsetattr(fd, TCSANOW, &toptions);    // commit the serial port settings
   printf("Attempting to communicate with arduino... \n");
-
   return 0;
 }
 
@@ -48,10 +45,13 @@ static void intro_message() {
 
 }
 
-static void onMouse(int event, int x, int y, int flags, void* userdata) {
-    if(event == cv::EVENT_LBUTTONDOWN) {
-        point = cv::Point2f((float)x, (float)y);
-        measurePoint = true;
+static void onMouse(int event, int x, int y, int flags, void* param) {
+    cv::Mat &src = *((cv::Mat*)param); //cast and deref the param
+    measurePoint = true;
+    clickCount++;
+    if (event == cv::EVENT_LBUTTONDOWN) {
+        clickedPointVal = src.at<cv::Vec3b>(y,x);
+        std::cout << x << " " << y << " val= "<< clickedPointVal << std::endl;
     }
 }
 
@@ -81,62 +81,69 @@ int main(int argc, char** argv) {
               30, cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
+  cv::Vec3b redColor, greenColor, blueColor;
+  cv::Mat inFrame, grayFrame, hsvFrame, outFrame, croppedFrame, prevFrame;
+  cv::Mat redBinFrame, greenBinFrame, blueBinFrame;
+  std::vector<cv::KeyPoint> keypoints;
+  int hsvPlusMinusThresh = 10;
+  // bool measuredRed = false;   // whether red ball color has been measured with click
+  // bool measuredGreen = false; // same for green ball
+  // bool measuredBlue = false;  // same for blue ball
+
   cv::namedWindow("Camera Input", 1);
   cv::namedWindow("Blue Channel", 1);
   cv::namedWindow("Green Channel", 1);
   cv::namedWindow("Red Channel", 1);
-  //cv::setMouseCallback("Camera Input", onMouse, 0);
+  cv::setMouseCallback("Camera Input", onMouse, &hsvFrame);
 
   //setupSerial();
 
-  cv::Vec3b redColor, greenColor, blueColor;
-  cv::Mat inFrame, grayFrame, outFrame, tmpFrame, prevFrame;
-  cv::Mat bgrFrames[3];
-  std::vector<cv::KeyPoint> keypoints;
-  // constexpr cv::Point2f topLeft = (240,20);
-  // constexpr cv::Point2f topRight = (740,20);
-  // constexpr cv::Point2f bottomLeft = (210,670);
-  // constexpr cv::Point2f bottomRight = (750,670);
+
+  // constexpr cv::Point2f topLeft = (57,144);
+  // constexpr int
 
   //sendCommand("h\n"); // Home the motor and encoder
-/*
   // Calibrate colors
   while(!calibrated) {
     vid >> inFrame;
+    cv::cvtColor(inFrame, hsvFrame, cv::COLOR_BGR2HSV);
     if(!inFrame.empty()) {
       if(measurePoint) {
-        if(!measuredRed) {
-          redColor = inFrame.at<cv::Vec3b>(point);
-          measuredRed = true;
+        if(clickCount < 2) {
+          redColor = clickedPointVal;
+          // measuredRed = true;
           measurePoint = false;
+          std::cout << "Red Calibration: "<< " val= "<< clickedPointVal << std::endl;
         }
-        else if(!measuredGreen) {
-          greenColor = inFrame.at<cv::Vec3b>(point);
-          measuredGreen = true;
+        else if(clickCount < 3) {
+          greenColor = clickedPointVal;
+          // measuredGreen = true;
           measurePoint = false;
+          std::cout << "Green Calibration: "<< " val= "<< clickedPointVal << std::endl;
         }
-        else if(!measuredBlue) {
-          blueColor = inFrame.at<cv::Vec3b>(point);
-          measuredBlue = true;
+        else if(clickCount < 4) {
+          blueColor = clickedPointVal;
+          // measuredBlue = true;
           measurePoint = false;
           calibrated = true;
+          std::cout << "Blue Calibration: "<< " val= "<< clickedPointVal << std::endl;
         }
       }
       cv::imshow("Camera Input", inFrame);
       cv::waitKey(10);
     }
   }
-  */
 
   // infinite loop
   while(true) {
     frameCounter++;
     vid >> inFrame; // get a new frame from camera
-    cv::split(inFrame,bgrFrames);
     if(!inFrame.empty()) {
 
       // ----- START PROJECT CODE  ----- //
       // Read image
+      cv::cvtColor(inFrame, hsvFrame, cv::COLOR_BGR2HSV);
+
 
 
 
@@ -190,31 +197,28 @@ int main(int argc, char** argv) {
 
       // Show blobs
       //cv::imshow("keypoints", im_with_keypoints );
-      cv::waitKey(0);
 
-      //cv::imshow("Camera Input", inFrame);
-      cv::imshow("Blue Input", bgrFrames[0]);
-      //cv::imshow("Green Input", bgrFrames[1]);
-      //cv::imshow("Red Input", bgrFrames[2]);
-      if (bgrFrames[0].empty()) {
-        std::cout << "Blue Channel Empty\n";
-      }
-
-
+      cv::imshow("Camera Input", inFrame);
+      cv::imshow("Blue Input", blueBinFrame);
+      cv::imshow("Green Input", greenBinFrame);
+      cv::imshow("Red Input", redBinFrame);
 
       // enter a value greater than 0 to break out of the loop
       if(cv::waitKey(10) >= 0) break;
 
+      /*
       // Command structure is very simple
       // "h\n" is to home the motor
       // "g<integer range 7 to 53>\n" sends the motor to that position in cm
       // e.g. "g35\n" sends the motor to 35cm from left wall
       if(frameCounter%200==0) {
-        //sendCommand("g10\n");
+        sendCommand("g10\n");
       }
       else if(frameCounter%100==0){
-        //sendCommand("g50\n");
+        sendCommand("g50\n");
       }
+      */
+
     }
   }
   return 0;

@@ -6,7 +6,7 @@ CMakeLists.txt.user*
 *.orig
 out/
 output/
-build/
+*build/
 build-release/
 build-debug/
 docs/html
