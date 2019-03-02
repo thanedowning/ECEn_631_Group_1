@@ -83,29 +83,74 @@ int main(int argc, char** argv) {
               vid.get(cv::CAP_PROP_FRAME_HEIGHT)), 0);
 
   cv::Vec3b redColor, greenColor, blueColor;
-  cv::Mat inFrame, grayFrame, hsvFrame, outFrame, croppedFrame, prevFrame;
+  cv::Mat inFrame, grayFrame, hsvFrame, outFrame, croppedFrame, prevFrame, mask;
   cv::Mat redBinFrame, greenBinFrame, blueBinFrame;
   std::vector<cv::KeyPoint> keypoints;
-  int hsvPlusMinusThresh = 10;
-  // bool measuredRed = false;   // whether red ball color has been measured with click
-  // bool measuredGreen = false; // same for green ball
-  // bool measuredBlue = false;  // same for blue ball
+  cv::Mat im_with_keypoints;
 
+  /*
+        # define range of blue color in HSV
+          lower_green = np.array([70,80,0])
+          upper_green  = np.array([85,255,255])
+
+          lower_blue = np.array([86,170,0])
+          upper_blue = np.array([102,255,255])
+
+          lower_red = np.array([160,100,0])
+          upper_red = np.array([180,255,255])*/
+  // Thresholds
+  int hsvPlusMinusThresh = 5;
+  int redLowH = 160;
+  int redHighH = 180;
+  int greenLowH = 70;
+  int greenHighH = 85;
+  int blueLowH = 86;
+  int blueHighH = 102;
+  int lowSat = 80;
+  int highSat = 255;
+  int lowVal = 40;
+  int highVal = 255;
+
+  // Name windows
   cv::namedWindow("Camera Input", 1);
-  cv::namedWindow("Blue Channel", 1);
-  cv::namedWindow("Green Channel", 1);
-  cv::namedWindow("Red Channel", 1);
+  cv::namedWindow("Blue Input", 1);
+  cv::namedWindow("Green Input", 1);
+  cv::namedWindow("Red Input", 1);
   cv::setMouseCallback("Camera Input", onMouse, &hsvFrame);
+
+  ////// Blob Detection Parameters/////
+  // Setup SimpleBlobDetector parameters.
+  cv::SimpleBlobDetector::Params params;
+  // Change thresholds
+  params.minThreshold = 0;
+  params.maxThreshold = 255;
+  // Filter by Area.
+  params.filterByArea = true;
+  params.minArea = 20;
+  // Filter by Circularity
+  params.filterByCircularity = false;
+  params.minCircularity = 0.2;
+  // Filter by Convexity
+  params.filterByConvexity = false;
+  params.minConvexity = 0.5;
+  // Filter by Inertia
+  params.filterByInertia = false;
+  params.minInertiaRatio = 0.8;
+  // Set up detector with params
+  cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
 
   //setupSerial();
 
+  cv::Point2i topLeft = cv::Point2i(57,144);
+  int boardPixelwidth = 332;
+  int boardPixelheight = 390;
 
-  cv::Point2f topLeft = (57,144);
-  constexpr int boardPixelwidth = 332;
-  constexpr int boardPixelheight = 390;
-
+  // Erode Dilate Size
+  cv::Size erodeDilateSize  = cv::Size(1,1);
   //sendCommand("h\n"); // Home the motor and encoder
   // Calibrate colors
+
+
   while(!calibrated) {
     vid >> inFrame;
     cv::cvtColor(inFrame, hsvFrame, cv::COLOR_BGR2HSV);
@@ -113,19 +158,26 @@ int main(int argc, char** argv) {
       if(measurePoint) {
         if(clickCount < 2) {
           redColor = clickedPointVal;
+          redLowH = redColor[0] - hsvPlusMinusThresh;
+          redHighH = redColor[0] + hsvPlusMinusThresh;
           // measuredRed = true;
           measurePoint = false;
           std::cout << "Red Calibration: "<< " val= "<< clickedPointVal << std::endl;
+
         }
         else if(clickCount < 3) {
           greenColor = clickedPointVal;
           // measuredGreen = true;
+          greenLowH = greenColor[0] - hsvPlusMinusThresh;
+          greenHighH = greenColor[0] + hsvPlusMinusThresh;
           measurePoint = false;
           std::cout << "Green Calibration: "<< " val= "<< clickedPointVal << std::endl;
         }
         else if(clickCount < 4) {
           blueColor = clickedPointVal;
           // measuredBlue = true;
+          blueLowH = blueColor[0] - hsvPlusMinusThresh;
+          blueHighH = blueColor[0] + hsvPlusMinusThresh;
           measurePoint = false;
           calibrated = true;
           std::cout << "Blue Calibration: "<< " val= "<< clickedPointVal << std::endl;
@@ -136,69 +188,103 @@ int main(int argc, char** argv) {
     }
   }
 
+
+
   // infinite loop
   while(true) {
     frameCounter++;
     vid >> inFrame; // get a new frame from camera
     if(!inFrame.empty()) {
 
+
       // ----- START PROJECT CODE  ----- //
       // Read image
       cv::cvtColor(inFrame, hsvFrame, cv::COLOR_BGR2HSV);
 
+      //Blue Balls
+      cv::inRange(hsvFrame, cv::Scalar(blueLowH,lowSat,lowVal),
+                  cv::Scalar(blueHighH,highSat,highVal), blueBinFrame);
+      cv::erode(blueBinFrame, blueBinFrame, cv::getStructuringElement(
+                cv::MORPH_ELLIPSE, erodeDilateSize));
+      cv::dilate(blueBinFrame, blueBinFrame, cv::getStructuringElement(
+                 cv::MORPH_ELLIPSE, erodeDilateSize));
+
+      //Green Balls
+      cv::inRange(hsvFrame, cv::Scalar(greenLowH,lowSat,lowVal),
+                  cv::Scalar(greenHighH,highSat,highVal), greenBinFrame);
+      cv::erode(greenBinFrame, greenBinFrame, cv::getStructuringElement(
+                cv::MORPH_ELLIPSE, erodeDilateSize));
+      cv::dilate(greenBinFrame, greenBinFrame, cv::getStructuringElement(
+                 cv::MORPH_ELLIPSE, erodeDilateSize));
 
 
+      //Red Balls
+      cv::inRange(hsvFrame, cv::Scalar(redLowH,lowSat,lowVal),
+                  cv::Scalar(redHighH,highSat,highVal), redBinFrame);
+      cv::erode(redBinFrame, redBinFrame, cv::getStructuringElement(
+                cv::MORPH_ELLIPSE, erodeDilateSize));
+      cv::dilate(redBinFrame, redBinFrame, cv::getStructuringElement(
+                 cv::MORPH_ELLIPSE, erodeDilateSize));
 
-      ////// Blob Detection/////
-      //cv::Mat im = cv::imread( "blob.jpg", cv::IMREAD_GRAYSCALE );
-      for(int i=0; i < 3; i++) {
-        cv::cvtColor(inFrame, grayFrame, CV_BGR2GRAY);
+  /*
+      for(int i = 0; i < 3; i++) {
 
-        // Setup SimpleBlobDetector parameters.
-        cv::SimpleBlobDetector::Params params;
+        // Blue Balls
+        if(i == 0){
+          cv::inRange(hsvFrame, cv::Scalar(blueLowH,lowSat,lowVal),
+                      cv::Scalar(blueHighH,highSat,highVal), blueBinFrame);
+          mask = blueBinFrame;
+        }
 
-        // Change thresholds
-        params.minThreshold = 10;
-        params.maxThreshold = 200;
+        //Green Balls
+        else if(i == 1){
+          cv::inRange(hsvFrame, cv::Scalar(greenLowH,lowSat,lowVal),
+                      cv::Scalar(greenHighH,highSat,highVal), greenBinFrame);
+          mask = greenBinFrame;
+        }
 
-        // Filter by Area.
-        params.filterByArea = true;
-        params.minArea = 1500; // pixel area
+        //Red Balls
+        else{
+          cv::inRange(hsvFrame, cv::Scalar(redLowH,lowSat,lowVal),
+                      cv::Scalar(redHighH,highSat,highVal), redBinFrame);
+          mask = redBinFrame;
+        }
 
-        // Filter by Circularity
-        params.filterByCircularity = true;
-        params.minCircularity = 0.9; //1 is a perfect circle
+        // erode out the noise
+    		cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8,8)));
 
-        // Filter by Convexity
-        params.filterByConvexity = false;
-        // params.minConvexity = 0.87;
-
-        // Filter by Inertia
-        params.filterByInertia = false;
-        // params.minInertiaRatio = 0.01;
-
-        // Set up detector with params
-        cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
+    		// dilate again to fill in holes
+    		cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8,8)));
 
         // SimpleBlobDetector::create creates a smart pointer.
-        // So you need to use arrow ( ->) instead of dot ( . )
-        detector->detect(inFrame, keypoints);
+        detector->detect(mask, keypoints);
+
+        cv::drawKeypoints(inFrame, keypoints, im_with_keypoints,
+          cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+
+        double maxBlob = 0;
+        for(std::vector<cv::KeyPoint>::iterator blobIterator = keypoints.begin(); blobIterator != keypoints.end(); blobIterator++){
+           std::cout << "size of blob is: " << blobIterator->size << std::endl;
+           std::cout << "point is at: " << blobIterator->pt.x << " " << blobIterator->pt.y << std::endl;
+        }
+
+        // Blue Balls
+        if(i == 0){
+          cv::drawKeypoints(blueBinFrame, keypoints, blueBinFrame,
+            cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+        //Green Balls
+        }else if(i == 1){
+          cv::drawKeypoints(greenBinFrame, keypoints, drawFrame,
+            cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+        //Red Balls
+        }else{
+          cv::drawKeypoints(redBinFrame, keypoints, drawFrame,
+            cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+        }
       }
 
+      */
 
-
-
-      // Detect blobs.
-
-      // detector.detect( inFrame, keypoints);
-
-      // Draw detected blobs as red circles.
-      // DrawMatchesFlags::DRAW_RICH_KEYPOINTS flag ensures the size of the circle corresponds to the size of blob
-      cv::Mat im_with_keypoints;
-      cv::drawKeypoints(inFrame, keypoints, im_with_keypoints, cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-
-      // Show blobs
-      //cv::imshow("keypoints", im_with_keypoints );
 
       cv::imshow("Camera Input", inFrame);
       cv::imshow("Blue Input", blueBinFrame);
