@@ -46,13 +46,14 @@ static void intro_message() {
 }
 
 static void onMouse(int event, int x, int y, int flags, void* param) {
-    cv::Mat &src = *((cv::Mat*)param); //cast and deref the param
+  cv::Mat &src = *((cv::Mat*)param); //cast and deref the param
+  if (event == cv::EVENT_LBUTTONDOWN) {
     measurePoint = true;
     clickCount++;
-    if (event == cv::EVENT_LBUTTONDOWN) {
-        clickedPointVal = src.at<cv::Vec3b>(y,x);
-        std::cout << x << " " << y << " val= "<< clickedPointVal << std::endl;
-    }
+    clickedPointVal = src.at<cv::Vec3b>(y,x);
+    std::cout << x << " " << y << " val= "<< clickedPointVal << std::endl;
+    std::cout << "click count" << clickCount << std::endl;
+  }
 }
 
 int main(int argc, char** argv) {
@@ -99,8 +100,9 @@ int main(int argc, char** argv) {
   //setupSerial();
 
 
-  // constexpr cv::Point2f topLeft = (57,144);
-  // constexpr int
+  cv::Point2f topLeft = (57,144);
+  constexpr int boardPixelwidth = 332;
+  constexpr int boardPixelheight = 390;
 
   //sendCommand("h\n"); // Home the motor and encoder
   // Calibrate colors
