@@ -3,6 +3,8 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <stdio.h>
+#include <string>
+#include <sstream>
 
 #include <opencv2/opencv.hpp>
 
@@ -13,6 +15,15 @@ bool measurePoint = false;  // after mouse click, set to true
 bool calibrated = false;    // used to stop the calibration loop
 cv::Vec3b clickedPointVal;
 int clickCount = 0;
+cv::Point2f leftBinPixel;
+cv::Point2f rightBinPixel;
+cv::Point2f blueLocation;
+cv::Point2f redLocation;
+cv::Point2f greenLocation;
+const double boardWidthPixels = 410;
+const double boardWidthCm = 46;
+const double cmPerPixel = boardWidthCm / boardWidthPixels;
+
 
 void sendCommand(const char* command) {
   printf("Sending Command: %s", command);
@@ -53,8 +64,51 @@ static void onMouse(int event, int x, int y, int flags, void* param) {
     clickedPointVal = src.at<cv::Vec3b>(y,x);
     std::cout << x << " " << y << " val= "<< clickedPointVal << std::endl;
     std::cout << "click count" << clickCount << std::endl;
+    point = cv::Point(x,y);
   }
 }
+
+int getBallPos(cv::Point2f pt){
+  // Get x position of ball in cm
+
+
+  int xpos = int(pt.x * cmPerPixel);
+  if(xpos > 53)
+    xpos = 53;
+  else if(xpos < 7)
+    xpos = 7;
+  return xpos;
+}
+
+void catchBall(std::string ball){
+  std::string cmd;
+  int pos = 0;
+  std::stringstream stream;
+
+  // catch red ball
+  if(ball.compare("red") == 0){
+    // Use the global Point2f "redLocation" to command motor
+    std::cout << "catch red ball" << std::endl;
+    pos = int(getBallPos(redLocation));
+  // catch green ball
+  }
+  else if(ball.compare("green") == 0){
+    // Use the global Point2f "greenLocation" to command motor
+    std::cout << "catch green ball" << std::endl;
+    pos = int(getBallPos(greenLocation));
+  // catch blue ball
+  }
+  else if(ball.compare("blue") == 0){
+    // Use the global Point2f "blueLocation" to command motor
+    std::cout << "catch blue ball" << std::endl;
+    pos = int(getBallPos(blueLocation));
+  }
+  stream << "g" << pos << "\n";
+  cmd = stream.str();
+  sendCommand(cmd.c_str());
+}
+
+
 
 int main(int argc, char** argv) {
   int frameCounter = 0;
@@ -87,6 +141,9 @@ int main(int argc, char** argv) {
   cv::Mat redBinFrame, greenBinFrame, blueBinFrame;
   std::vector<cv::KeyPoint> keypoints;
   cv::Mat im_with_keypoints;
+  cv::Moments m;
+
+
 
   /*
         # define range of blue color in HSV
@@ -126,9 +183,9 @@ int main(int argc, char** argv) {
   params.maxThreshold = 255;
   // Filter by Area.
   params.filterByArea = true;
-  params.minArea = 20;
+  params.minArea = 10;
   // Filter by Circularity
-  params.filterByCircularity = false;
+  params.filterByCircularity = true;
   params.minCircularity = 0.2;
   // Filter by Convexity
   params.filterByConvexity = false;
@@ -139,15 +196,17 @@ int main(int argc, char** argv) {
   // Set up detector with params
   cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
 
-  //setupSerial();
+  setupSerial();
+
+
 
   cv::Point2i topLeft = cv::Point2i(57,144);
   int boardPixelwidth = 332;
   int boardPixelheight = 390;
 
   // Erode Dilate Size
-  cv::Size erodeDilateSize  = cv::Size(1,1);
-  //sendCommand("h\n"); // Home the motor and encoder
+  cv::Size erodeDilateSize  = cv::Size(12,12);
+  sendCommand("h\n"); // Home the motor and encoder
   // Calibrate colors
 
 
@@ -179,8 +238,22 @@ int main(int argc, char** argv) {
           blueLowH = blueColor[0] - hsvPlusMinusThresh;
           blueHighH = blueColor[0] + hsvPlusMinusThresh;
           measurePoint = false;
-          calibrated = true;
           std::cout << "Blue Calibration: "<< " val= "<< clickedPointVal << std::endl;
+        }
+        // left bin calibration
+        else if(clickCount < 5) {
+          measurePoint = false;
+          std::cout << "Left Bin Calibration: " << std::endl;
+          std::cout << "x = " << point.x << " y = " << point.y << std::endl;
+          leftBinPixel = point;
+        }
+        // right bin calibration
+        else if(clickCount < 6) {
+          measurePoint = false;
+          std::cout << "Right Bin Calibration: " << std::endl;
+          std::cout << "x = " << point.x << " y = " << point.y << std::endl;
+          rightBinPixel = point;
+          calibrated = true;
         }
       }
       cv::imshow("Camera Input", inFrame);
@@ -209,6 +282,32 @@ int main(int argc, char** argv) {
       cv::dilate(blueBinFrame, blueBinFrame, cv::getStructuringElement(
                  cv::MORPH_ELLIPSE, erodeDilateSize));
 
+      // USE FOR BLOB DETECTION //
+      // detector->detect(blueBinFrame, keypoints);
+      // cv::drawKeypoints(inFrame, keypoints, im_with_keypoints,
+      // cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+      //
+      // cv::drawKeypoints(blueBinFrame, keypoints, blueBinFrame,
+      //  cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+      // double maxBlob = 0;
+      // for(std::vector<cv::KeyPoint>::iterator blobIterator = keypoints.begin(); blobIterator != keypoints.end(); blobIterator++){
+      //   std::cout << "size of blue blob is: " << blobIterator->size << std::endl;
+      //   std::cout << "point is at: " << blobIterator->pt.x << " " << blobIterator->pt.y << std::endl;
+      // }
+      m = cv::moments(blueBinFrame,true);
+  		blueLocation = cv::Point(m.m10/m.m00, m.m01/m.m00);
+
+  		// coordinates of centroid
+  		// std::cout<< cv::Mat(blueLocation)<< std::flush;
+
+      cv::cvtColor(blueBinFrame, blueBinFrame, cv::COLOR_GRAY2BGR);
+  		cv::circle( blueBinFrame, blueLocation,
+  		15,
+  		cv::Scalar(255,
+  		0,0),
+  		2, 8, 0 );
+
+
       //Green Balls
       cv::inRange(hsvFrame, cv::Scalar(greenLowH,lowSat,lowVal),
                   cv::Scalar(greenHighH,highSat,highVal), greenBinFrame);
@@ -216,6 +315,19 @@ int main(int argc, char** argv) {
                 cv::MORPH_ELLIPSE, erodeDilateSize));
       cv::dilate(greenBinFrame, greenBinFrame, cv::getStructuringElement(
                  cv::MORPH_ELLIPSE, erodeDilateSize));
+      m = cv::moments(greenBinFrame,true);
+  		greenLocation = cv::Point(m.m10/m.m00, m.m01/m.m00);
+
+
+  		// coordinates of centroid
+  		// std::cout<< cv::Mat(greenLocation)<< std::flush;
+
+      cv::cvtColor(greenBinFrame, greenBinFrame, cv::COLOR_GRAY2BGR);
+  		cv::circle( greenBinFrame, greenLocation,
+  		15,
+  		cv::Scalar(255,
+  		0,0),
+  		2, 8, 0 );
 
 
       //Red Balls
@@ -226,66 +338,27 @@ int main(int argc, char** argv) {
       cv::dilate(redBinFrame, redBinFrame, cv::getStructuringElement(
                  cv::MORPH_ELLIPSE, erodeDilateSize));
 
-  /*
-      for(int i = 0; i < 3; i++) {
+      // find moments of the image
+  		m = cv::moments(redBinFrame,true);
+  		redLocation = cv::Point(m.m10/m.m00, m.m01/m.m00);
 
-        // Blue Balls
-        if(i == 0){
-          cv::inRange(hsvFrame, cv::Scalar(blueLowH,lowSat,lowVal),
-                      cv::Scalar(blueHighH,highSat,highVal), blueBinFrame);
-          mask = blueBinFrame;
-        }
-
-        //Green Balls
-        else if(i == 1){
-          cv::inRange(hsvFrame, cv::Scalar(greenLowH,lowSat,lowVal),
-                      cv::Scalar(greenHighH,highSat,highVal), greenBinFrame);
-          mask = greenBinFrame;
-        }
-
-        //Red Balls
-        else{
-          cv::inRange(hsvFrame, cv::Scalar(redLowH,lowSat,lowVal),
-                      cv::Scalar(redHighH,highSat,highVal), redBinFrame);
-          mask = redBinFrame;
-        }
-
-        // erode out the noise
-    		cv::erode(mask, mask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8,8)));
-
-    		// dilate again to fill in holes
-    		cv::dilate(mask, mask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(8,8)));
-
-        // SimpleBlobDetector::create creates a smart pointer.
-        detector->detect(mask, keypoints);
-
-        cv::drawKeypoints(inFrame, keypoints, im_with_keypoints,
-          cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-
-        double maxBlob = 0;
-        for(std::vector<cv::KeyPoint>::iterator blobIterator = keypoints.begin(); blobIterator != keypoints.end(); blobIterator++){
-           std::cout << "size of blob is: " << blobIterator->size << std::endl;
-           std::cout << "point is at: " << blobIterator->pt.x << " " << blobIterator->pt.y << std::endl;
-        }
-
-        // Blue Balls
-        if(i == 0){
-          cv::drawKeypoints(blueBinFrame, keypoints, blueBinFrame,
-            cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-        //Green Balls
-        }else if(i == 1){
-          cv::drawKeypoints(greenBinFrame, keypoints, drawFrame,
-            cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-        //Red Balls
-        }else{
-          cv::drawKeypoints(redBinFrame, keypoints, drawFrame,
-            cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
-        }
-      }
-
-      */
+  		// coordinates of centroid
+  		// std::cout<< cv::Mat(redLocation)<< std::flush;
 
 
+      cv::cvtColor(redBinFrame, redBinFrame, cv::COLOR_GRAY2BGR);
+  		cv::circle( redBinFrame, redLocation,
+  		15,
+  		cv::Scalar(255,
+  		0,0),
+  		2, 8, 0 );
+
+      ///////Decide which ball to catch and command using catchBall///////
+      // Use globals redLocation, greenLocation, and blueLocation
+      catchBall("green");
+
+
+      // Show image
       cv::imshow("Camera Input", inFrame);
       cv::imshow("Blue Input", blueBinFrame);
       cv::imshow("Green Input", greenBinFrame);
@@ -293,6 +366,9 @@ int main(int argc, char** argv) {
 
       // enter a value greater than 0 to break out of the loop
       if(cv::waitKey(10) >= 0) break;
+
+
+
 
       /*
       // Command structure is very simple
