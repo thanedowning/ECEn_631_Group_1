@@ -20,9 +20,9 @@ cv::Point2f rightBinPixel;
 cv::Point2f blueLocation;
 cv::Point2f redLocation;
 cv::Point2f greenLocation;
-const double boardWidthPixels = 410;
-const double boardWidthCm = 46;
-const double cmPerPixel = boardWidthCm / boardWidthPixels;
+double boardWidthPixels = 0;
+double boardWidthCm = 46;
+double cmPerPixel = 0;
 
 
 void sendCommand(const char* command) {
@@ -70,13 +70,15 @@ static void onMouse(int event, int x, int y, int flags, void* param) {
 
 int getBallPos(cv::Point2f pt){
   // Get x position of ball in cm
-
-
-  int xpos = int(pt.x * cmPerPixel);
-  if(xpos > 53)
+  int xpos = int((pt.x - leftBinPixel.x) * cmPerPixel) + 7;
+  if(xpos > 53) {
     xpos = 53;
-  else if(xpos < 7)
+    std::cout << "ERROR: Ball position calculated at > 53 cm\n";
+  }
+  else if(xpos < 7) {
     xpos = 7;
+    std::cout << "ERROR: Ball position calculated at < 7 cm\n";
+  }
   return xpos;
 }
 
@@ -131,6 +133,9 @@ int main(int argc, char** argv) {
     return 0;
   }
 
+  vid.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+  vid.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+
   cv::VideoWriter vidout;
   vidout.open("../out/result.avi", cv::VideoWriter::fourcc('M','P','E','G'),
               30, cv::Size(vid.get(cv::CAP_PROP_FRAME_WIDTH),
@@ -143,6 +148,9 @@ int main(int argc, char** argv) {
   cv::Mat im_with_keypoints;
   cv::Moments m;
 
+  int redBall_y, greenBall_y, blueBall_y;
+  int yDistThresh = 10;
+  int catchWhich = 0;  // 1 for catching green; 2 for catching blue
 
 
   /*
@@ -197,8 +205,7 @@ int main(int argc, char** argv) {
   cv::Ptr<cv::SimpleBlobDetector> detector = cv::SimpleBlobDetector::create(params);
 
   setupSerial();
-
-
+//typing something 
 
   cv::Point2i topLeft = cv::Point2i(57,144);
   int boardPixelwidth = 332;
@@ -206,7 +213,6 @@ int main(int argc, char** argv) {
 
   // Erode Dilate Size
   cv::Size erodeDilateSize  = cv::Size(12,12);
-  sendCommand("h\n"); // Home the motor and encoder
   // Calibrate colors
 
 
@@ -254,6 +260,8 @@ int main(int argc, char** argv) {
           std::cout << "x = " << point.x << " y = " << point.y << std::endl;
           rightBinPixel = point;
           calibrated = true;
+          boardWidthPixels = rightBinPixel.x - leftBinPixel.x;
+          cmPerPixel = boardWidthCm / boardWidthPixels;
         }
       }
       cv::imshow("Camera Input", inFrame);
@@ -261,6 +269,7 @@ int main(int argc, char** argv) {
     }
   }
 
+  sendCommand("h\n"); // Home the motor and encoder
 
 
   // infinite loop
@@ -290,7 +299,8 @@ int main(int argc, char** argv) {
       // cv::drawKeypoints(blueBinFrame, keypoints, blueBinFrame,
       //  cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
       // double maxBlob = 0;
-      // for(std::vector<cv::KeyPoint>::iterator blobIterator = keypoints.begin(); blobIterator != keypoints.end(); blobIterator++){
+      // for(std::vector<cv::KeyPoint>::iterator blobIterator = keypoints.begin(); 
+      //     blobIterator != keypoints.end(); blobIterator++){
       //   std::cout << "size of blue blob is: " << blobIterator->size << std::endl;
       //   std::cout << "point is at: " << blobIterator->pt.x << " " << blobIterator->pt.y << std::endl;
       // }
@@ -355,7 +365,46 @@ int main(int argc, char** argv) {
 
       ///////Decide which ball to catch and command using catchBall///////
       // Use globals redLocation, greenLocation, and blueLocation
-      catchBall("green");
+      redBall_y = int(redLocation.y);
+      greenBall_y = int(greenLocation.y);
+      blueBall_y = int(blueLocation.y);
+
+      
+      if (redBall_y < leftBinPixel.y)
+        catchBall("red");
+      else if (greenBall_y < leftBinPixel.y)
+        catchBall("green");
+      else
+        catchBall("blue");
+      
+      /* This one sucks
+      if (blueBall_y > greenBall_y && blueBall_y > redBall_y) 
+        catchBall("blue");
+      else if (greenBall_y > redBall_y) 
+        catchBall("green");
+      else 
+        catchBall("red");
+      */
+
+      // else if (greenBall_y ) 
+      // if(redBall_y < (yDistThresh + (leftBinPixel.y+rightBinPixel.y)/2)) {
+      //   catchBall("red");
+      //   if ((greenBall_y > blueBall_y || catchWhich == 1) && (catchWhich != 2)) {
+      //     catchBall("green");
+      //     catchWhich = 1;
+      //     if(greenBall_y > (yDistThresh + (leftBinPixel.y+rightBinPixel.y)/2)) {
+      //       catchBall("blue");
+      //     }
+      //   }
+      //   else {
+      //       catchBall("blue");
+      //       catchWhich = 2;
+      //       if(blueBall_y > (yDistThresh + (leftBinPixel.y+rightBinPixel.y)/2)) {
+      //         catchBall("green");
+      //       }
+      //   }
+      // }
+     
 
 
       // Show image
@@ -365,7 +414,7 @@ int main(int argc, char** argv) {
       cv::imshow("Red Input", redBinFrame);
 
       // enter a value greater than 0 to break out of the loop
-      if(cv::waitKey(10) >= 0) break;
+      if(cv::waitKey(10) == 32) break;
 
 
 
@@ -376,10 +425,10 @@ int main(int argc, char** argv) {
       // "g<integer range 7 to 53>\n" sends the motor to that position in cm
       // e.g. "g35\n" sends the motor to 35cm from left wall
       if(frameCounter%200==0) {
-        sendCommand("g10\n");
+        //sendCommand("g10\n");
       }
       else if(frameCounter%100==0){
-        sendCommand("g50\n");
+        //sendCommand("g50\n");
       }
       */
 
