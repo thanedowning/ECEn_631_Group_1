@@ -16,3 +16,13 @@ make
 Use keys 1 through 5 for testing different effects.  Press f to turn on object classification.  Press esc to quit.
 
 A video of the session will be automatically generated and put in the output directory titled result.avi.
+
+
+### Use for Project 2: Plinko
+
+Commands to run for write access to serial port (commanding Arduino):
+
+```
+sudo adduser $USER dialout
+sudo usermod -a -G dialout $USER
+```
