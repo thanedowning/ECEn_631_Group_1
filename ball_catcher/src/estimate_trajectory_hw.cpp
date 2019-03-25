@@ -2,9 +2,8 @@
 
 using namespace std;
 
-void TrajectoryEstimator::init(bool display)
+TrajectoryEstimator::TrajectoryEstimator()
 {   
-    display_ = display;
     camL.name = "Left";
     camR.name = "Right";
 
@@ -26,6 +25,8 @@ void TrajectoryEstimator::init(bool display)
     fin["T"] >> T;
     fin["F"] >> F;
     fin.release();
+    
+    create_windows();
 
     // Rectification params
     cv::Mat Q;
@@ -35,29 +36,69 @@ void TrajectoryEstimator::init(bool display)
     camR.Q = Q;
 }
 
-Vector3f TrajectoryEstimator::run(int i)    
+Vector3f TrajectoryEstimator::run()    
 {   
     int t = 0;
     Vector3f pt3;
-    bool ballL = find_ball(camL, i);
-    bool ballR = find_ball(camR, i);
+    bool ballL = find_ball(camL);
+    bool ballR = find_ball(camR);
     if (ballL && ballR) 
     {   
         t = 100;
-        track_ball(camL, i);
-        track_ball(camR, i);
+        track_ball(camL);
+        track_ball(camR);
         pt3 = calc_3dpoints(i);
+
+        xv.push_back(pt3[0]);
+        yv.push_back(pt3[1]);
+        zv.push_back(pt3[2]);
     }
     else
     {
         t = 10;
-        display_img(camL, camL.imgs[i], camL.name);
-        display_img(camR, camR.imgs[i], camR.name);
+        // display_img(camL, camL.imgs[i], camL.name);
+        // display_img(camR, camR.imgs[i], camR.name);
         pt3 = Vector3f::Zero();
     }
     if (cv::waitKey(t) == 113) exit(0);
 
     return pt3;
+}
+
+vector<double> TrajectoryEstimator::estimate()
+{
+    VectorXf x(xv.size());
+    VectorXf y(yv.size());
+    VectorXf z(zv.size());
+    MatrixXf A(xv.size(), 3);
+    Vector3f a;
+    VectorXf bx(xv.size());
+    VectorXf by(xv.size());
+    Vector3f cx;
+    Vector3f cy;
+    
+    for (int i=0; i < xv.size(); i++)
+    {
+        x[i] = xv[i];
+        y[i] = yv[i];
+        z[i] = zv[i];
+
+        a << z[i]*z[i], z[i], 1;
+        A.row(i) = a;
+
+        bx[i] = x[i]; 
+        by[i] = y[i]; 
+    }
+
+    cx = A.colPivHouseholderQr().solve(bx);
+    cy = A.colPivHouseholderQr().solve(by);
+
+    cout << "size: " << bx.size() << endl;
+    cout << "cx: " << cx << endl;
+    cout << "cy: " << cy << endl;
+
+    vector<double> prediction{cx[2], cy[2]};
+    return prediction;
 }
 
 void TrajectoryEstimator::setup_cam(CamData &cam, string param_file)
@@ -68,7 +109,7 @@ void TrajectoryEstimator::setup_cam(CamData &cam, string param_file)
     fin.release();
 }
 
-bool TrajectoryEstimator::find_ball(CamData &cam, int i)
+bool TrajectoryEstimator::find_ball(CamData &cam)
 {
     bool found_ball(false);
 
@@ -162,6 +203,8 @@ Vector3f TrajectoryEstimator::calc_3dpoints(int i)
 
     // Get 3d ball location in left camera frame 
     cv::perspectiveTransform(persp_pts, pts_3d, camL.Q);
+
+    // OFFSETS //
     pts_3d[0].x -= 10.135;
     pts_3d[0].y -= 29.0;
     pts_3d[0].z -= 21.0;
