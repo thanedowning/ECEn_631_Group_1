@@ -135,14 +135,18 @@ long QSProcessThreadFunc(CTCSys *QS)
 			}
 
 			if (counter == 0)
-				trj = TrajectoryEstimator();
+				trj = TrajectoryEstimator(false, QS->IR.ProcBuf[0], QS->IR.ProcBuf[1]);
 
-			trj.run(QS->IR.ProcBuf[0]);
+			trj.run(QS->IR.ProcBuf[0], QS->IR.ProcBuf[1]);
 
-			// This is how you move the catcher.  QS->moveX and QS->moveY (both in inches) must be calculated and set first.
-			QS->Move_X = 5;					// replace 0 with your x coordinate
-			QS->Move_Y = 5;					// replace 0 with your y coordinate
-			SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+			if (!trj.xv.size())
+			{
+				prediction = trj.estimate();
+				// This is how you move the catcher.  QS->moveX and QS->moveY (both in inches) must be calculated and set first.
+				QS->Move_X = prediction[0];					// replace 0 with your x coordinate
+				QS->Move_Y = prediction[1];					// replace 0 with your y coordinate
+				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
+			}
 
 			counter++;
 		}

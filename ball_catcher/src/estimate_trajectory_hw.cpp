@@ -2,10 +2,14 @@
 
 using namespace std;
 
-TrajectoryEstimator::TrajectoryEstimator()
+TrajectoryEstimator::TrajectoryEstimator(bool display, cv::Mat img_0L, cv::Mat img_0R)
 {   
+    display_ = display;
     camL.name = "Left";
     camR.name = "Right";
+
+    img_0L.copyTo(camL.img_0);
+    img_0R.copyTo(camR.img_0);
 
     int w(200);
     camL.roi = cv::Rect(350, 0, w, w);
@@ -36,33 +40,33 @@ TrajectoryEstimator::TrajectoryEstimator()
     camR.Q = Q;
 }
 
-Vector3f TrajectoryEstimator::run()    
+Vector3f TrajectoryEstimator::run(cv::Mat imgL, cv::Mat imgR)    
 {   
-    int t = 0;
-    Vector3f pt3;
-    bool ballL = find_ball(camL);
-    bool ballR = find_ball(camR);
-    if (ballL && ballR) 
+    // int t = 0;
+    Vector3f pt3d;
+    bool ballL_found = find_ball(camL, imgL);
+    bool ballR_found = find_ball(camR, imgR);
+    if (ballL_found && ballR_found) 
     {   
-        t = 100;
-        track_ball(camL);
-        track_ball(camR);
-        pt3 = calc_3dpoints(i);
+        // t = 100;
+        track_ball(camL, imgL);
+        track_ball(camR, imgR);
+        pt3d = calc_3dpoints();
 
-        xv.push_back(pt3[0]);
-        yv.push_back(pt3[1]);
-        zv.push_back(pt3[2]);
+        xv.push_back(pt3d[0]);
+        yv.push_back(pt3d[1]);
+        zv.push_back(pt3d[2]);
     }
     else
     {
-        t = 10;
+        // t = 10;
         // display_img(camL, camL.imgs[i], camL.name);
         // display_img(camR, camR.imgs[i], camR.name);
-        pt3 = Vector3f::Zero();
+        pt3d = Vector3f::Zero();
     }
-    if (cv::waitKey(t) == 113) exit(0);
+    // if (cv::waitKey(t) == 113) exit(0);
 
-    return pt3;
+    return pt3d;
 }
 
 vector<double> TrajectoryEstimator::estimate()
@@ -109,27 +113,18 @@ void TrajectoryEstimator::setup_cam(CamData &cam, string param_file)
     fin.release();
 }
 
-bool TrajectoryEstimator::find_ball(CamData &cam)
+bool TrajectoryEstimator::find_ball(CamData &cam, cv::Mat img)
 {
     bool found_ball(false);
 
     vector<cv::KeyPoint> kps;
-    vector<cv::Point2f> pts;
 
     cv::Mat img, gray, enlarged;
-    img = cv::imread(string(cam.img_files[i]));
     img = img(cam.roi);
     cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
-    cam.imgs.push_back(gray);
-    if (i == 0)
-    {
-        cam.keypoints.push_back(kps);
-        cam.points.push_back(pts);
-        return false;
-    }
 
     cv::Mat bin;
-    cv::absdiff(cam.imgs[0], gray, bin);
+    cv::absdiff(cam.img_0, gray, bin);
     cv::threshold(bin, bin, 20, 255, 0);
     cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
     cv::erode(bin, bin, element);
@@ -144,14 +139,11 @@ bool TrajectoryEstimator::find_ball(CamData &cam)
         cv::Point2f pt(kps[0].pt.x, kps[0].pt.y);
         pt.x += cam.roi.x;
         pt.y += cam.roi.y;
-        pts.push_back(pt);
+        cam.loc = pt;
     }
 
-    cam.keypoints.push_back(kps);
-    cam.points.push_back(pts);
-    
-    string title = "Binary " + cam.name;
-    display_img(cam, bin, title);
+    // string title = "Binary " + cam.name;
+    // display_img(cam, bin, title);
 
     return found_ball;
 }
@@ -175,30 +167,30 @@ void TrajectoryEstimator::find_middle(vector<cv::KeyPoint> &kps)
     kps = new_vec;
 }
 
-void TrajectoryEstimator::track_ball(CamData &cam, int i)
+void TrajectoryEstimator::track_ball(CamData &cam, cv::Mat img)
 {
     // Undistort
-    cv::undistortPoints(cam.points[i], cam.points[i], 
-                             cam.mtx, cam.dist, cam.R, cam.P);
+    vector<cv::Point2f> pts{cam.loc};
+    cv::undistortPoints(pts, pts, cam.mtx, cam.dist, cam.R, cam.P);
+    cam.loc = pts[0];
     
     cv::Mat img_kps;
-    cam.keypoints[i][0].pt = cam.points[i][0];
-    cv::drawKeypoints(cam.imgs[i], cam.keypoints[i], img_kps, 
-        cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
+    cam.keypoints[0].pt = cam.loc;
+    // cv::drawKeypoints(img, cam.keypoints[i], img_kps, 
+        // cv::Scalar(0,0,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS );
     
-    cv::Point2f center;
-    center.x = cam.points[i][0].x-cam.roi.x;
-    center.y = cam.points[i][0].y-cam.roi.y;
-    cv::circle(img_kps, center, 10, cv::Scalar(255,0,0));
+    // cv::Point2f center;
+    // center.x = cam.loc.x-cam.roi.x;
+    // center.y = cam.loc.y-cam.roi.y;
+    // cv::circle(img_kps, center, 10, cv::Scalar(255,0,0));
 
-    display_img(cam, img_kps, cam.name);
+    // display_img(cam, img_kps, cam.name);
 }
 
-Vector3f TrajectoryEstimator::calc_3dpoints(int i)
+Vector3f TrajectoryEstimator::calc_3dpoints()
 {
     vector<cv::Point3f> persp_pts, pts_3d;
-    cv::Point3f pt(camL.points[i][0].x, camL.points[i][0].y, 
-                    camL.points[i][0].x - camR.points[i][0].x);
+    cv::Point3f pt(camL.loc.x, camL.loc.y, camL.loc.x - camR.loc.x);
     persp_pts.push_back(pt);
 
     // Get 3d ball location in left camera frame 
