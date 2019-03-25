@@ -17,12 +17,13 @@ cv::Vec3b clickedPointVal;
 int clickCount = 0;
 cv::Point2f leftBinPixel;
 cv::Point2f rightBinPixel;
-cv::Point2f blueLocation;
-cv::Point2f redLocation;
-cv::Point2f greenLocation;
+cv::Point2f blueLocation(0,0);
+cv::Point2f redLocation(0,0);
+cv::Point2f greenLocation(0,0);
 double boardWidthPixels = 0;
 double boardWidthCm = 46;
 double cmPerPixel = 0;
+int prevCmd = 7;
 
 
 void sendCommand(const char* command) {
@@ -71,14 +72,14 @@ static void onMouse(int event, int x, int y, int flags, void* param) {
 int getBallPos(cv::Point2f pt){
   // Get x position of ball in cm
   int xpos = int((pt.x - leftBinPixel.x) * cmPerPixel) + 7;
-  if(xpos > 53) {
-    xpos = 53;
-    std::cout << "ERROR: Ball position calculated at > 53 cm\n";
-  }
-  else if(xpos < 7) {
-    xpos = 7;
-    std::cout << "ERROR: Ball position calculated at < 7 cm\n";
-  }
+  // if(xpos > 53) {
+    // xpos = 53;
+    // std::cout << "ERROR: Ball position calculated at > 53 cm\n";
+  // }
+  // else if(xpos < 7) {
+    // xpos = 7;
+    // std::cout << "ERROR: Ball position calculated at < 7 cm\n";
+  // }
   return xpos;
 }
 
@@ -104,6 +105,18 @@ void catchBall(std::string ball){
     // Use the global Point2f "blueLocation" to command motor
     std::cout << "catch blue ball" << std::endl;
     pos = int(getBallPos(blueLocation));
+  }
+  if(pos < 7) {
+    std::cout << "pos: " << pos << " (less than 7)" << std::endl;
+    pos = prevCmd;
+  }
+  if(pos > 53) {
+    std::cout << "pos: " << pos << " (greater than 53)" << std::endl;
+    pos = prevCmd;
+  }
+  else {
+    std::cout << "pos: " << pos << std::endl;
+    prevCmd = pos;
   }
   stream << "g" << pos << "\n";
   cmd = stream.str();
@@ -148,7 +161,9 @@ int main(int argc, char** argv) {
   cv::Mat im_with_keypoints;
   cv::Moments m;
 
-  int redBall_y, greenBall_y, blueBall_y;
+  int redBall_y = 0;
+  int greenBall_y = 0;
+  int blueBall_y = 0;
   int yDistThresh = 10;
   int catchWhich = 0;  // 1 for catching green; 2 for catching blue
 
@@ -369,13 +384,14 @@ int main(int argc, char** argv) {
       greenBall_y = int(greenLocation.y);
       blueBall_y = int(blueLocation.y);
 
-      
+      std::cout << "\nredBall_x: " << int(redLocation.x) << std::endl;
+      std::cout << "redBall_y: " << redBall_y << ", leftBinPixel.y: " << leftBinPixel.y << std::endl;
       if (redBall_y < leftBinPixel.y)
         catchBall("red");
       else if (greenBall_y < leftBinPixel.y)
         catchBall("green");
       else
-        catchBall("blue");
+        catchBall("red");
       
       /* This one sucks
       if (blueBall_y > greenBall_y && blueBall_y > redBall_y) 

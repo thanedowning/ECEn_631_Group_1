@@ -1,5 +1,6 @@
-#include <ball_catcher/estimate_trajectory.h>
+#include <ball_catcher/estimate_trajectory_hw.h>
 
+int counter = 0;
 
 int main()
 {
@@ -7,9 +8,9 @@ int main()
     vector<double> yv;
     vector<double> zv;
     Vector3f xyz;
-    TrajectoryEstimator trj = TrajectoryEstimator();
+    TrajectoryEstimator trj;
 
-    trj.init(true);
+    trj.init(false);
 
     for (int i=0; i < 100; i++)
     {
@@ -24,6 +25,37 @@ int main()
     VectorXf x(xv.size());
     VectorXf y(yv.size());
     VectorXf z(zv.size());
+    MatrixXf A(xv.size(), 3);
+    Vector3f a;
+    VectorXf bx(xv.size());
+    VectorXf by(xv.size());
+    Vector3f cx;
+    Vector3f cy;
+    
+    for (int i=0; i < xv.size(); i++)
+    {
+        x[i] = xv[i];
+        y[i] = yv[i];
+        z[i] = zv[i];
+
+        a << z[i]*z[i], z[i], 1;
+        A.row(i) = a;
+
+        bx[i] = x[i]; 
+        by[i] = y[i]; 
+    }
+
+    cx = A.colPivHouseholderQr().solve(bx);
+    cy = A.colPivHouseholderQr().solve(by);
+
+    cout << "size: " << bx.size() << endl;
+    cout << "cx: " << cx << endl;
+    cout << "cy: " << cy << endl;
+
+    double x_predicted = cx[2];
+    double y_predicted = cy[2];
+    cout << "\nx = " << x_predicted << endl;
+    cout << "y = " << y_predicted << endl;
     
     return 0;
 }

@@ -1,6 +1,5 @@
-#include <ball_catcher/estimate_trajectory.h>
+#include <ball_catcher/estimate_trajectory_hw.h>
 
-namespace fs = std::filesystem;
 using namespace std;
 
 void TrajectoryEstimator::init(bool display)
@@ -8,19 +7,6 @@ void TrajectoryEstimator::init(bool display)
     display_ = display;
     camL.name = "Left";
     camR.name = "Right";
-
-    create_windows();
-    
-    pvec files;
-    string n = "4";
-    string prefix = "/home/seth/school/robotic_vision/4/";
-    string dir = prefix + "bb_imgs/" + n;
-    fs::path p(dir);
-    copy(fs::directory_iterator(p), fs::directory_iterator(), back_inserter(files));
-    sort(files.begin(), files.end());
-    camL.img_files = pvec(files.begin(), files.begin() + (files.size()/2));
-    camR.img_files = pvec(files.begin() + (files.size()/2), files.end());
-    // num_imgs = int(camL.img_files.size());
 
     int w(200);
     camL.roi = cv::Rect(350, 0, w, w);
@@ -30,10 +16,10 @@ void TrajectoryEstimator::init(bool display)
     detector = cv::SimpleBlobDetector::create(params);
 
     // Get intrinsics
-    setup_cam(camL, prefix + "params/left_cam.yaml");
-    setup_cam(camR, prefix + "params/right_cam.yaml");
+    setup_cam(camL, "params/left_cam.yaml");
+    setup_cam(camR, "params/right_cam.yaml");
     // Get extrinsic parameters
-    cv::FileStorage fin(prefix + "params/stereo.yaml", cv::FileStorage::READ);
+    cv::FileStorage fin("params/stereo.yaml", cv::FileStorage::READ);
     cv::Mat R, T, E, F;
     fin["R"] >> R;
     fin["E"] >> E;
