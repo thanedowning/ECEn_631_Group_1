@@ -1,4 +1,5 @@
-#include <ball_catcher/estimate_trajectory_hw.h>
+#include "stdafx.h"
+#include "estimate_trajectory_hw.h"
 
 using namespace std;
 
@@ -7,6 +8,12 @@ TrajectoryEstimator::TrajectoryEstimator(bool display, cv::Mat img_0L, cv::Mat i
     display_ = display;
     camL.name = "Left";
     camR.name = "Right";
+
+	cv::imshow("Justin is Cool", img_0L);
+	cv::waitKey(0);
+
+	cv::cvtColor(img_0L, img_0L, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(img_0R, img_0R, cv::COLOR_BGR2GRAY);
 
     img_0L.copyTo(camL.img_0);
     img_0R.copyTo(camR.img_0);
@@ -19,10 +26,10 @@ TrajectoryEstimator::TrajectoryEstimator(bool display, cv::Mat img_0L, cv::Mat i
     detector = cv::SimpleBlobDetector::create(params);
 
     // Get intrinsics
-    setup_cam(camL, "params/left_cam.yaml");
-    setup_cam(camR, "params/right_cam.yaml");
+    setup_cam(camL, "left_cam.yaml");
+    setup_cam(camR, "right_cam.yaml");
     // Get extrinsic parameters
-    cv::FileStorage fin("params/stereo.yaml", cv::FileStorage::READ);
+    cv::FileStorage fin("stereo.yaml", cv::FileStorage::READ);
     cv::Mat R, T, E, F;
     fin["R"] >> R;
     fin["E"] >> E;
@@ -119,12 +126,11 @@ bool TrajectoryEstimator::find_ball(CamData &cam, cv::Mat img)
 
     vector<cv::KeyPoint> kps;
 
-    cv::Mat img, gray, enlarged;
     img = img(cam.roi);
-    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+	cv::cvtColor(img, img, CV_BGR2GRAY);
 
     cv::Mat bin;
-    cv::absdiff(cam.img_0, gray, bin);
+    cv::absdiff(cam.img_0, img, bin);
     cv::threshold(bin, bin, 20, 255, 0);
     cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
     cv::erode(bin, bin, element);

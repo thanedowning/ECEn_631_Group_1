@@ -1,6 +1,4 @@
-#include <ball_catcher/estimate_trajectory_hw.h>
-
-int counter = 0;
+#include <ball_catcher/estimate_trajectory.h>
 
 int main()
 {

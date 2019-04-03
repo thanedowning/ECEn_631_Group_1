@@ -3,7 +3,7 @@
 #include "time.h"
 #include "math.h"
 #include "Hardware.h"
-#include "ball_catcher/estimate_trajectory_hw.h"
+#include "estimate_trajectory_hw.h"
 
 ImagingResources	CTCSys::IR;
 
@@ -129,21 +129,27 @@ long QSProcessThreadFunc(CTCSys *QS)
 			// Images are acquired into ProcBuf[0] for left and ProcBuf[1] for right camera
 			// Need to create child image or small region of interest for processing to exclude background and speed up processing
 			// Mat child = QS->IR.ProcBuf[i](Rect(x, y, width, height));
-			for(i=0; i < QS->IR.NumCameras; i++) {
-				cvtColor(QS->IR.ProcBuf[i][BufID], QS->IR.OutBuf1[i], CV_RGB2GRAY, 0);
+			//for(i=0; i < QS->IR.NumCameras; i++) {
+				// cvtColor(QS->IR.ProcBuf[i], QS->IR.OutBuf1[i], CV_RGB2GRAY, 0);
 				// Canny(QS->IR.ProcBuf[i], QS->IR.OutBuf1[i], 70, 100);
-			}
+			//}
 
+			Mat left, right;
+			left = QS->IR.ProcBuf[0].clone();
+			right = QS->IR.ProcBuf[1].clone();
+			if (left.empty() || right.empty())
+				return 0;
 			if (counter == 0)
-				trj = TrajectoryEstimator(false, QS->IR.ProcBuf[0], QS->IR.ProcBuf[1]);
+				trj = TrajectoryEstimator(false, left, right);
 
-			trj.run(QS->IR.ProcBuf[0], QS->IR.ProcBuf[1]);
-
+			trj.run(left, right);
+			QS->IR.OutBuf1[0] = left.clone();
+			QS->IR.OutBuf1[1] = right.clone();
 			if (!trj.xv.size())
 			{
-				prediction = trj.estimate();
+				vector<double> prediction = trj.estimate();
 				// This is how you move the catcher.  QS->moveX and QS->moveY (both in inches) must be calculated and set first.
-				QS->Move_X = prediction[0];					// replace 0 with your x coordinate
+				QS->Move_X = -prediction[0];					// replace 0 with your x coordinate
 				QS->Move_Y = prediction[1];					// replace 0 with your y coordinate
 				SetEvent(QS->QSMoveEvent);		// Signal the move event to move catcher. The event will be reset in the move thread.
 			}
@@ -153,7 +159,6 @@ long QSProcessThreadFunc(CTCSys *QS)
 		else 
 		{
 			counter = 0;
-			trj.clear();
 		}
 		// Display Image
 		if (QS->IR.UpdateImage) {
